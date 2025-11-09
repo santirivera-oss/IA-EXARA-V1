@@ -21,7 +21,7 @@ async function enviarPregunta() {
     const loaderDiv = agregarMensaje("bot", "<span class='loader-bounce'>⛏️ Procesando...</span>", true);
 
     try {
-        const res = await fetch("https://ia-exara-backend.onrender.com/ask", {
+        const res = await fetch("http://127.0.0.1:5000/ask", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ question: pregunta })
