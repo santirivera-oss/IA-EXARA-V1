@@ -1,10 +1,22 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import subprocess
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="frontend")  # Carpeta opcional "frontend"
 CORS(app)
 
+# Endpoint raíz para evitar 404
+@app.route("/", methods=["GET"])
+def home():
+    # Si tienes un index.html en la carpeta frontend, se sirve
+    index_path = os.path.join(app.static_folder, "index.html")
+    if os.path.exists(index_path):
+        return send_from_directory(app.static_folder, "index.html")
+    # Si no existe, mensaje simple
+    return "<h1>IA Minera Exara Backend ⚡</h1><p>Servidor activo. Usa el endpoint /ask para consultas.</p>"
+
+# Endpoint principal de preguntas
 @app.route("/ask", methods=["POST"])
 def ask():
     data = request.get_json()
@@ -14,7 +26,7 @@ def ask():
         return jsonify({"error": "No se envió pregunta."}), 400
 
     try:
-        # Prompt limpio para Gemma: respuestas largas y humanas, sin instrucciones visibles
+        # Prompt limpio para Gemma: respuestas largas y humanas
         prompt = f"""
 Eres un experto en minería con décadas de experiencia y excelente capacidad de comunicación. 
 Tu tarea es responder a la pregunta de manera **clara, profesional y detallada**, como si explicaras a un estudiante avanzado o a un profesional que busca comprensión profunda. 
@@ -31,7 +43,6 @@ Sigue estas pautas:
 Pregunta: "{pregunta}"
 """
 
-
         result = subprocess.run(
             ["ollama", "run", "gemma", prompt],
             capture_output=True,
@@ -45,4 +56,7 @@ Pregunta: "{pregunta}"
     return jsonify({"answer": respuesta})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Asegúrate de que Render use 0.0.0.0 y puerto $PORT
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
