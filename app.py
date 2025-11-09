@@ -1,23 +1,24 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import subprocess
+import requests
 import os
 
-# Servimos todos los archivos desde la raíz del repositorio
-app = Flask(__name__, static_folder=".", static_url_path="")
+app = Flask(__name__, static_folder="frontend")  # Carpeta de tu index.html
 CORS(app)
 
-# Endpoint raíz: sirve index.html si existe, o mensaje simple
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def home(path):
-    file_path = os.path.join(app.static_folder, path)
-    if path != "" and os.path.exists(file_path):
-        return send_from_directory(app.static_folder, path)
-    elif os.path.exists(os.path.join(app.static_folder, "index.html")):
+# Configura tu token de Hugging Face como variable de entorno en Render
+HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
+HF_MODEL = "bigscience/bloom"  # Modelo gratuito, puedes cambiarlo
+
+headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+
+# Endpoint raíz para evitar 404
+@app.route("/", methods=["GET"])
+def home():
+    index_path = os.path.join(app.static_folder, "index.html")
+    if os.path.exists(index_path):
         return send_from_directory(app.static_folder, "index.html")
-    else:
-        return "<h1>IA Minera Exara Backend ⚡</h1><p>Servidor activo. Usa el endpoint /ask para consultas.</p>"
+    return "<h1>IA Minera Exara Backend ⚡</h1><p>Servidor activo. Usa el endpoint /ask para consultas.</p>"
 
 # Endpoint principal de preguntas
 @app.route("/ask", methods=["POST"])
@@ -29,33 +30,33 @@ def ask():
         return jsonify({"error": "No se envió pregunta."}), 400
 
     try:
-        # Prompt profesional para Gemma: respuestas largas y humanas
+        # Prompt profesional y humanizado
         prompt = f"""
 Eres un experto en minería con décadas de experiencia y excelente capacidad de comunicación. 
-Tu tarea es responder a la pregunta de manera clara, profesional y detallada, como si explicaras a un estudiante avanzado o a un profesional que busca comprensión profunda. 
-Sigue estas pautas:
-
-1. Proporciona respuestas completas y bien estructuradas, divididas en párrafos.
-2. Incluye contexto, razones y posibles aplicaciones de lo que explicas.
-3. Usa ejemplos concretos y comparaciones si ayudan a clarificar.
-4. Humaniza la respuesta: usa un tono natural, amistoso y confiable, como ChatGPT 5.
-5. Usa emojis sutiles y contextuales, solo donde aporten claridad o emoción.
-6. Evita instrucciones, títulos innecesarios o encabezados tipo “Respuesta:”.
-7. Termina con una frase amable de cierre o recomendación cuando tenga sentido.
+Responde de manera clara, profesional y detallada, como ChatGPT 5:
+- Respuestas completas y estructuradas
+- Con contexto, ejemplos y aplicaciones
+- Tono natural y confiable
+- Emojis sutiles donde tengan sentido
 
 Pregunta: "{pregunta}"
 """
 
-        result = subprocess.run(
-            ["ollama", "run", "gemma", prompt],
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
-        respuesta = result.stdout.strip()
-    except Exception as e:
-        respuesta = f"❌ Error al ejecutar Gemma: {e}"
+        payload = {"inputs": prompt, "parameters": {"max_new_tokens": 400}}
+        res = requests.post(f"https://api-inference.huggingface.co/models/{HF_MODEL}", headers=headers, json=payload, timeout=60)
+        res.raise_for_status()
+        output = res.json()
 
+        # Extraer texto generado
+        if isinstance(output, list) and "generated_text" in output[0]:
+            respuesta = output[0]["generated_text"]
+        else:
+            respuesta = "❌ No se recibió respuesta del modelo."
+
+    except Exception as e:
+        respuesta = f"❌ Error al conectar con Hugging Face: {e}"
+
+    # Aquí podrías aplicar tu función de humanización si quieres ajustar más emojis o cierres
     return jsonify({"answer": respuesta})
 
 if __name__ == "__main__":
