@@ -9,7 +9,7 @@ CORS(app)
 
 # Token de Hugging Face
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
-HF_MODEL = "bigscience/bloom"
+HF_MODEL = "bigscience/bloomz"  # reemplaza con uno que funcione
 headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
 
 # ------------------------------
